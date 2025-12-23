@@ -83,13 +83,14 @@ def get_nws_alerts(lat, lon):
 # --- APP SETUP ---
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
 
-# --- IOS SAFARI DARK MODE FIX ---
+# --- IOS SAFARI DARK MODE FIX (NUCLEAR OPTION) ---
+# We removed the 'media' queries. This forces the black bar ALWAYS.
 st.markdown(
     """
     <meta name="theme-color" content="#0e1117">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
-        html, body, [class*="stApp"] {
+        /* Force the entire app background to be the dark hex code */
+        .stApp {
             background-color: #0e1117;
         }
     </style>
