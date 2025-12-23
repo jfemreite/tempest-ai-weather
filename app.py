@@ -21,13 +21,13 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# --- NEW: SMART FALLBACK FUNCTION ---
+# --- SMART FALLBACK FUNCTION (UPDATED) ---
 def ask_gemini_smartly(prompt_text):
     """
     Tries to get an answer from a list of models.
     If the first one is 'tired' (Quota Limit), it tries the next one.
     """
-    # Priority list: Best/Fastest -> Backup -> Older/Stable
+    # User-defined model priority list
     models_to_try = [
         'gemini-2.5-flash-lite', 
         'gemini-2.5-flash', 
@@ -283,7 +283,6 @@ try:
 
         with st.chat_message("assistant"):
             with st.spinner("Consulting NWS data..."):
-                # Use our new fallback function for chat too
                 response_text = ask_gemini_smartly(system_context)
                 
                 if response_text:
