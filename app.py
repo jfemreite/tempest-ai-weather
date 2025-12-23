@@ -23,6 +23,10 @@ genai.configure(api_key=GEMINI_API_KEY)
 
 # --- SMART FALLBACK FUNCTION ---
 def ask_gemini_smartly(prompt_text):
+    """
+    Tries to get an answer from a list of models.
+    If the first one is 'tired' (Quota Limit), it tries the next one.
+    """
     models_to_try = [
         'gemini-2.5-flash-lite', 
         'gemini-2.5-flash', 
@@ -79,13 +83,25 @@ def get_nws_alerts(lat, lon):
 # --- APP SETUP ---
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
 
-# --- HEADER WITH LOGO (RESIZED) ---
-# Adjusted column ratio to give the image more space
+# --- IOS SAFARI DARK MODE FIX ---
+st.markdown(
+    """
+    <meta name="theme-color" content="#0e1117">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        html, body, [class*="stApp"] {
+            background-color: #0e1117;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# --- HEADER WITH LOGO ---
 col1, col2 = st.columns([1.5, 5]) 
 
 with col1:
     if os.path.exists("ramseyct.jpg"):
-        # UPDATED: Increased width from 100 to 160
         st.image("ramseyct.jpg", width=160) 
     else:
         st.header("☁️") 
