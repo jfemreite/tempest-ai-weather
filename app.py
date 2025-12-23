@@ -29,10 +29,9 @@ def ask_gemini_smartly(prompt_text):
     """
     # Priority list: Best/Fastest -> Backup -> Older/Stable
     models_to_try = [
+        'gemini-2.5-flash-lite', 
         'gemini-2.5-flash', 
-        'gemini-1.5-flash', 
-        'gemini-1.5-pro',
-        'gemini-1.0-pro'
+        'gemini-3-flash'
     ]
     
     for model_name in models_to_try:
