@@ -3,6 +3,8 @@ import requests
 import google.generativeai as genai
 import os
 import datetime
+import pandas as pd
+import altair as alt
 from dotenv import load_dotenv
 
 # 1. Load Keys
@@ -60,8 +62,8 @@ def get_nws_alerts(lat, lon):
         return []
 
 # --- APP SETUP ---
-st.set_page_config(page_title="Ramsey Ct Weather", page_icon="⛈️")
-st.title("Ramsey Ct Weather")
+st.set_page_config(page_title="Tempest AI Teacher", page_icon="⛈️")
+st.title("🎓 Tempest AI Meteorology Teacher")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -100,7 +102,7 @@ try:
     # 5-Day Forecast Text (Used for both Outlook & Chat)
     daily_forecast_text = ""
     try:
-        daily_data = data['forecast']['daily'][:7] # Grab 7 days for the outlook
+        daily_data = data['forecast']['daily'][:7] 
         for day in daily_data:
             day_ts = day['day_start_local']
             day_name = datetime.datetime.fromtimestamp(day_ts).strftime('%A')
@@ -114,7 +116,7 @@ try:
 
     # --- DASHBOARD UI ---
     
-    # Alerts
+    # Alerts (Minimizable by default)
     if alerts:
         for alert in alerts:
             severity = alert.get('severity', 'Unknown')
@@ -146,30 +148,78 @@ try:
     
     st.divider()
 
-    # --- NEW: AI WEEKLY OUTLOOK ---
-    st.subheader("📅 Weekly Forecast Strategy")
-    
-    # We check if we already generated the outlook to save time/cost
-    if "weekly_outlook" not in st.session_state:
-        with st.spinner("Analyzing the week ahead..."):
-            outlook_prompt = f"""
-            Act as a Weather Strategist.
-            Here is the 7-day forecast:
-            {daily_forecast_text}
+    # --- NEW SECTION: 24-HOUR TRENDS ---
+    # We use st.expander to make it collapsible ("Minimizable")
+    with st.expander("📈 24-Hour Trends (Temperature & Rain)", expanded=True):
+        try:
+            # 1. Prepare Data for Chart
+            hourly_data = data['forecast']['hourly']
             
-            Write a "Weekly Outlook" for the user.
-            1. **Headline:** A 4-6 word summary of the week.
-            2. **Trend:** Are we warming up or cooling down?
-            3. **Key Days:** Mention specific days to watch out for (rain, high wind, or perfect weather).
-            4. **Advice:** One practical tip (e.g., "Mow the lawn Tuesday," "Wash the car Sunday").
+            # Create a simplified list of dictionaries for the dataframe
+            chart_data = []
+            for hour in hourly_data:
+                # Calculate readable time (e.g., "2 PM")
+                ts = hour['time']
+                local_time = datetime.datetime.fromtimestamp(ts).strftime('%I %p')
+                
+                chart_data.append({
+                    "Time": local_time,
+                    "Temperature (°F)": hour['air_temperature'],
+                    "Rain Chance (%)": hour['precip_probability'],
+                    "Timestamp": ts # Helper for sorting
+                })
             
-            Keep it concise and formatted with Markdown.
-            """
-            outlook_response = model.generate_content(outlook_prompt)
-            st.session_state.weekly_outlook = outlook_response.text
+            # Convert to Pandas DataFrame
+            df = pd.DataFrame(chart_data)
 
-    # Display the stored outlook
-    st.info(st.session_state.weekly_outlook)
+            # 2. Build the Dual-Axis Chart using Altair
+            base = alt.Chart(df).encode(
+                x=alt.X('Time', sort=None) # Keep order as is
+            )
+
+            # Layer 1: Temperature Line (Red)
+            line = base.mark_line(color='#FF5733').encode(
+                y=alt.Y('Temperature (°F)', axis=alt.Axis(title='Temp (°F)', titleColor='#FF5733'))
+            )
+
+            # Layer 2: Rain Area (Blue)
+            area = base.mark_area(opacity=0.3, color='#337DFF').encode(
+                y=alt.Y('Rain Chance (%)', axis=alt.Axis(title='Rain Prob (%)', titleColor='#337DFF'))
+            )
+
+            # Combine them
+            chart = alt.layer(area, line).resolve_scale(
+                y='independent' # Allows two different Y-axes
+            )
+
+            st.altair_chart(chart, use_container_width=True)
+            
+        except Exception as e:
+            st.error(f"Could not load chart data: {e}")
+
+    # --- AI WEEKLY OUTLOOK (Minimizable) ---
+    # We moved this into an expander too for better organization
+    with st.expander("📅 AI Weekly Strategy", expanded=False):
+        
+        if "weekly_outlook" not in st.session_state:
+            with st.spinner("Analyzing the week ahead..."):
+                outlook_prompt = f"""
+                Act as a Weather Strategist.
+                Here is the 7-day forecast:
+                {daily_forecast_text}
+                
+                Write a "Weekly Outlook" for the user.
+                1. **Headline:** A 4-6 word summary of the week.
+                2. **Trend:** Are we warming up or cooling down?
+                3. **Key Days:** Mention specific days to watch out for.
+                4. **Advice:** One practical tip.
+                
+                Keep it concise and formatted with Markdown.
+                """
+                outlook_response = model.generate_content(outlook_prompt)
+                st.session_state.weekly_outlook = outlook_response.text
+
+        st.info(st.session_state.weekly_outlook)
 
     st.divider()
 
@@ -224,13 +274,9 @@ try:
                 
         st.session_state.messages.append({"role": "assistant", "content": response.text})
 
-    # REFRESH BUTTON (Clears both Data and Outlook Cache)
     if st.button("Refresh Data"):
         if "weather_data" in st.session_state:
             del st.session_state.weather_data
         if "weekly_outlook" in st.session_state:
             del st.session_state.weekly_outlook
         st.rerun()
-
-except Exception as e:
-    st.error(f"Error: {e}")
