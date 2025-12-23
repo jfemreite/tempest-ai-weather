@@ -30,7 +30,7 @@ def ask_gemini_smartly(prompt_text):
     models_to_try = [
         'gemini-2.5-flash-lite', 
         'gemini-2.5-flash', 
-        'gemini-3-flash'
+        'gemini-3-flash',
     ]
     
     for model_name in models_to_try:
