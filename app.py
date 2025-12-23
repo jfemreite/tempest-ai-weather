@@ -99,7 +99,7 @@ try:
     curr_trend_raw = current.get('pressure_trend', '') 
     curr_dir_cardinal = deg_to_compass(curr_dir_deg)
 
-    # 5-Day Forecast Text (Used for both Outlook & Chat)
+    # 5-Day Forecast Text
     daily_forecast_text = ""
     try:
         daily_data = data['forecast']['daily'][:7] 
@@ -116,7 +116,7 @@ try:
 
     # --- DASHBOARD UI ---
     
-    # Alerts (Minimizable by default)
+    # Alerts
     if alerts:
         for alert in alerts:
             severity = alert.get('severity', 'Unknown')
@@ -148,42 +148,46 @@ try:
     
     st.divider()
 
-    # --- NEW SECTION: 24-HOUR TRENDS (Separated Charts) ---
+    # --- 24-HOUR TRENDS (Improved Charts) ---
     with st.expander("📈 24-Hour Trends", expanded=True):
         try:
             hourly_data = data['forecast']['hourly']
             
-            # Prepare Data
+            # Prepare Data (Keeping Time as actual datetime objects)
             chart_data = []
             for hour in hourly_data:
                 ts = hour['time']
-                local_time = datetime.datetime.fromtimestamp(ts).strftime('%I %p')
-                # Simplified timestamp for sorting
+                dt_object = datetime.datetime.fromtimestamp(ts) # Keep as Object, don't convert to string yet!
+                
                 chart_data.append({
-                    "Time": local_time,
+                    "Time": dt_object, 
                     "Temperature": hour['air_temperature'],
-                    "Rain Chance": hour['precip_probability'],
-                    "Sort": ts 
+                    "Rain Chance": hour['precip_probability']
                 })
             
             df = pd.DataFrame(chart_data)
 
-            # CHART 1: Temperature (Line)
+            # CHART 1: Temperature (Simple Line)
             st.subheader("Temperature (°F)")
-            temp_chart = alt.Chart(df).mark_line(point=True, color='#FF5733').encode(
-                x=alt.X('Time', sort=None, axis=alt.Axis(labelAngle=-45)),
+            
+            # Note the ':T' in x='Time:T'. This tells Altair it is Time, not Text.
+            # We use 'format' inside axis to make it readable (e.g. "02 PM")
+            temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
+                x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
                 y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
-                tooltip=['Time', 'Temperature']
-            ).properties(height=250)
+                tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Temperature']
+            ).properties(height=200)
             
             st.altair_chart(temp_chart, use_container_width=True)
 
-            # CHART 2: Rain Probability (Bar)
+            # CHART 2: Rain Probability (Fixed Scale Bar)
             st.subheader("Rain Probability (%)")
+            
             rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
-                x=alt.X('Time', sort=None, axis=alt.Axis(labelAngle=-45)),
+                x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
+                # We force the domain to be 0-100 so 50% looks like half, not full.
                 y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
-                tooltip=['Time', 'Rain Chance']
+                tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Rain Chance']
             ).properties(height=200)
 
             st.altair_chart(rain_chart, use_container_width=True)
