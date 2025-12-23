@@ -7,7 +7,7 @@ import time
 import pandas as pd
 import altair as alt
 from dotenv import load_dotenv
-from zoneinfo import ZoneInfo # Standard library for Timezones
+from zoneinfo import ZoneInfo 
 
 # 1. Load Keys
 load_dotenv()
@@ -64,17 +64,17 @@ def get_nws_alerts(lat, lon):
         return []
 
 # --- APP SETUP ---
-st.set_page_config(page_title="Tempest AI Teacher", page_icon="⛈️")
-st.title("🎓 Tempest AI Meteorology Teacher")
+st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
+st.title("☁️ Ramsey Ct. Weather")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.session_state.messages.append({"role": "assistant", "content": "I'm ready to analyze. Ask me a question, and I'll break down the science for you."})
+    st.session_state.messages.append({"role": "assistant", "content": "I'm monitoring Ramsey Ct. conditions. Ask me anything!"})
 
 # --- DATA FETCHING ---
 try:
     if "weather_data" not in st.session_state:
-        with st.spinner('Triangulating data sources...'):
+        with st.spinner('Updating Ramsey Ct. data...'):
             station_info = get_station_info()
             st.session_state.station_info = station_info
             st.session_state.weather_data = get_tempest_forecast(station_info['id'])
@@ -111,186 +111,3 @@ try:
             day_name = day_dt.strftime('%A')
             
             high = day.get('air_temp_high', 'N/A')
-            low = day.get('air_temp_low', 'N/A')
-            cond = day.get('conditions', 'N/A')
-            pop = day.get('precip_probability', 0)
-            daily_forecast_text += f"- {day_name}: High {high}F, Low {low}F, {cond} ({pop}% Rain Chance)\n"
-    except:
-        daily_forecast_text = "Forecast data unavailable."
-
-    # --- DASHBOARD UI ---
-    
-    if alerts:
-        for alert in alerts:
-            severity = alert.get('severity', 'Unknown')
-            event_name = alert.get('event', 'Weather Alert')
-            with st.expander(f"⚠️ ACTIVE ALERT: {event_name} ({severity})", expanded=False):
-                st.write(f"**Source:** {alert.get('senderName')}")
-                st.error(alert.get('description'))
-    
-    # Metrics Grid
-    trend_delta = None
-    if curr_trend_raw:
-        if curr_trend_raw.lower() == 'falling':
-            trend_delta = f"- {curr_trend_raw.capitalize()}" 
-        elif curr_trend_raw.lower() == 'rising':
-            trend_delta = f"+ {curr_trend_raw.capitalize()}" 
-        else:
-            trend_delta = curr_trend_raw.capitalize() 
-
-    with st.container():
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Condition", curr_cond_text)
-        col2.metric("Temperature", f"{curr_temp:.1f}°F")
-        col3.metric("Humidity", f"{curr_hum}%")
-
-        col4, col5, col6 = st.columns(3)
-        col4.metric("Pressure", f"{curr_pres:.2f} inHg", delta=trend_delta)
-        col5.metric("Wind", f"{curr_wind:.1f} mph ({curr_dir_cardinal})")
-        col6.metric("Rain Today", f"{curr_rain:.2f} in")
-    
-    st.divider()
-
-    # --- 24-HOUR TRENDS (TIMEZONE FIXED) ---
-    with st.expander("📈 24-Hour Trends", expanded=True):
-        try:
-            # 1. Get raw hourly list
-            raw_hourly = data['forecast']['hourly']
-            
-            # 2. Get CURRENT time in Pacific
-            # We filter based on raw timestamps (which are absolute/UTC), so this logic stays robust
-            current_time_epoch = time.time()
-            
-            # Filter: Keep future hours
-            future_hourly = [h for h in raw_hourly if h['time'] > current_time_epoch]
-            
-            # Slice: Next 24 hours
-            chart_slice = future_hourly[:24]
-            
-            chart_data = []
-            for hour in chart_slice:
-                ts = hour['time']
-                
-                # TIMEZONE FIX 2: Convert UTC timestamp to US/Pacific object
-                # This ensures "05:00 UTC" is rendered as "21:00 PST"
-                dt_object = datetime.datetime.fromtimestamp(ts, ZoneInfo("US/Pacific"))
-                
-                chart_data.append({
-                    "Time": dt_object, 
-                    "Temperature": hour['air_temperature'],
-                    "Rain Chance": hour['precip_probability']
-                })
-            
-            df = pd.DataFrame(chart_data)
-            df = df.sort_values("Time")
-
-            # CHART 1: Temperature
-            st.subheader("Temperature (°F)")
-            
-            temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
-                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
-                y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
-                tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Temperature']
-            ).properties(height=200)
-            
-            st.altair_chart(temp_chart, use_container_width=True)
-
-            # CHART 2: Rain Probability
-            st.subheader("Rain Probability (%)")
-            
-            rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
-                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
-                y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
-                tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Rain Chance']
-            ).properties(height=200)
-
-            st.altair_chart(rain_chart, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"Could not load chart data: {e}")
-
-    # --- AI WEEKLY OUTLOOK ---
-    with st.expander("📅 AI Weekly Strategy", expanded=False):
-        
-        if "weekly_outlook" not in st.session_state:
-            with st.spinner("Analyzing the week ahead..."):
-                outlook_prompt = f"""
-                Act as a Weather Strategist.
-                Here is the 7-day forecast:
-                {daily_forecast_text}
-                
-                Write a "Weekly Outlook" for the user.
-                1. **Headline:** A 4-6 word summary of the week.
-                2. **Trend:** Are we warming up or cooling down?
-                3. **Key Days:** Mention specific days to watch out for.
-                4. **Advice:** One practical tip.
-                
-                Keep it concise and formatted with Markdown.
-                """
-                outlook_response = model.generate_content(outlook_prompt)
-                st.session_state.weekly_outlook = outlook_response.text
-
-        st.info(st.session_state.weekly_outlook)
-
-    st.divider()
-
-    # --- CHAT INTERFACE ---
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    if prompt := st.chat_input("Ask a question..."):
-        
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        st.session_state.messages.append({"role": "user", "content": prompt})
-
-        # --- TEACHER PROMPT ---
-        alert_text = "NO ACTIVE ALERTS."
-        if alerts:
-            alert_text = f"ACTIVE GOVERNMENT ALERTS: {[a['event'] for a in alerts]}."
-
-        system_context = f"""
-        Act as a Meteorology Professor.
-        
-        LIVE DATA:
-        - Pressure: {curr_pres} inHg ({curr_trend_raw})
-        - Humidity: {curr_hum}%
-        - Temp: {curr_temp} F
-        - Wind: {curr_wind} mph (from {curr_dir_cardinal})
-        - Rain Today: {curr_rain} inches
-        
-        ALERTS: {alert_text}
-        
-        FORECAST:
-        {daily_forecast_text}
-        
-        USER QUESTION: "{prompt}"
-        
-        FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
-        
-        **The Short Answer**
-        [Direct answer]
-        
-        **The Science Breakdown**
-        * **Observation:** [Data point used] [Source: Sensor]
-        * **Concept:** [Explain the concept]
-        * **Prediction:** [Implication] [Source: AI Model]
-        """
-
-        with st.chat_message("assistant"):
-            with st.spinner("Consulting NWS data..."):
-                response = model.generate_content(system_context)
-                st.markdown(response.text)
-                
-        st.session_state.messages.append({"role": "assistant", "content": response.text})
-
-    if st.button("Refresh Data"):
-        if "weather_data" in st.session_state:
-            del st.session_state.weather_data
-        if "weekly_outlook" in st.session_state:
-            del st.session_state.weekly_outlook
-        st.rerun()
-
-except Exception as e:
-    st.error(f"Error: {e}")
