@@ -78,7 +78,6 @@ try:
             st.session_state.weather_data = get_tempest_forecast(station_info['id'])
             st.session_state.alerts = get_nws_alerts(station_info['lat'], station_info['lon'])
             
-            # Clear old outlook when getting new data
             if "weekly_outlook" in st.session_state:
                 del st.session_state.weekly_outlook
     
@@ -116,7 +115,6 @@ try:
 
     # --- DASHBOARD UI ---
     
-    # Alerts
     if alerts:
         for alert in alerts:
             severity = alert.get('severity', 'Unknown')
@@ -148,16 +146,16 @@ try:
     
     st.divider()
 
-    # --- 24-HOUR TRENDS (Improved Charts) ---
+    # --- 24-HOUR TRENDS (FIXED) ---
     with st.expander("📈 24-Hour Trends", expanded=True):
         try:
-            hourly_data = data['forecast']['hourly']
+            # FIX 1: Slice to exactly 24 items so we don't graph 10 days of data
+            hourly_data = data['forecast']['hourly'][:24]
             
-            # Prepare Data (Keeping Time as actual datetime objects)
             chart_data = []
             for hour in hourly_data:
                 ts = hour['time']
-                dt_object = datetime.datetime.fromtimestamp(ts) # Keep as Object, don't convert to string yet!
+                dt_object = datetime.datetime.fromtimestamp(ts)
                 
                 chart_data.append({
                     "Time": dt_object, 
@@ -165,14 +163,15 @@ try:
                     "Rain Chance": hour['precip_probability']
                 })
             
+            # FIX 2: Sort the DataFrame by Time to prevent "zig-zag" lines
             df = pd.DataFrame(chart_data)
+            df = df.sort_values("Time")
 
             # CHART 1: Temperature (Simple Line)
             st.subheader("Temperature (°F)")
             
-            # Note the ':T' in x='Time:T'. This tells Altair it is Time, not Text.
-            # We use 'format' inside axis to make it readable (e.g. "02 PM")
             temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
+                # We use %I %p to show "02 PM"
                 x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
                 y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
                 tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Temperature']
@@ -185,7 +184,6 @@ try:
             
             rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
                 x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
-                # We force the domain to be 0-100 so 50% looks like half, not full.
                 y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
                 tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Rain Chance']
             ).properties(height=200)
