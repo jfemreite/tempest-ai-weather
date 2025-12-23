@@ -83,15 +83,12 @@ def get_nws_alerts(lat, lon):
 # --- APP SETUP ---
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
 
-# --- IOS SAFARI DARK MODE FIX (UPDATED) ---
-# We now define the theme color twice to force it on both Light and Dark system modes.
+# --- IOS SAFARI DARK MODE FIX ---
 st.markdown(
     """
-    <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#0e1117" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0e1117">
     <style>
-        html, body, [class*="stApp"] {
+        .stApp {
             background-color: #0e1117;
         }
     </style>
@@ -99,12 +96,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- HEADER WITH LOGO ---
-col1, col2 = st.columns([1.5, 5]) 
+# --- HEADER WITH LOGO (LARGE) ---
+# Increased column 1 width (from 1.5 to 2) to fit the bigger logo
+col1, col2 = st.columns([2, 5]) 
 
 with col1:
     if os.path.exists("ramseyct.jpg"):
-        st.image("ramseyct.jpg", width=160) 
+        # Increased width from 160 to 220
+        st.image("ramseyct.jpg", width=220) 
     else:
         st.header("☁️") 
 
