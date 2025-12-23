@@ -60,8 +60,8 @@ def get_nws_alerts(lat, lon):
         return []
 
 # --- APP SETUP ---
-st.set_page_config(page_title="Tempest AI Teacher", page_icon="⛈️")
-st.title("🎓 Tempest AI Meteorology Teacher")
+st.set_page_config(page_title="Ramsey Ct Weather", page_icon="⛈️")
+st.title("Ramsey Ct Weather")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
