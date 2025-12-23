@@ -65,7 +65,21 @@ def get_nws_alerts(lat, lon):
 
 # --- APP SETUP ---
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
-st.title("☁️ Ramsey Ct. Weather")
+
+# --- HEADER WITH LOGO ---
+# We use columns to put the logo next to the title
+col1, col2 = st.columns([1, 5]) # Ratio: Small logo column, Wide text column
+
+with col1:
+    # We check if file exists so app doesn't crash if upload fails
+    if os.path.exists("ramseyct.jpg"):
+        st.image("ramseyct.jpg", width=100) 
+    else:
+        st.header("☁️") # Fallback emoji if image is missing
+
+with col2:
+    st.title("Ramsey Ct. Weather")
+    st.caption("Culdesac Weather App") # Added the sub-text from your logo
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -106,7 +120,6 @@ try:
         daily_data = data['forecast']['daily'][:7] 
         for day in daily_data:
             day_ts = day['day_start_local']
-            # TIMEZONE FIX 1: Convert Forecast Text to Pacific
             day_dt = datetime.datetime.fromtimestamp(day_ts, ZoneInfo("US/Pacific"))
             day_name = day_dt.strftime('%A')
             
@@ -129,7 +142,7 @@ try:
                 st.error(alert.get('description'))
     
     # Metrics Grid
-    st.subheader("Current Conditions") # Added Label
+    st.subheader("Current Conditions") 
     
     trend_delta = None
     if curr_trend_raw:
@@ -153,8 +166,8 @@ try:
     
     st.divider()
 
-    # --- AI WEEKLY OUTLOOK (Moved Up) ---
-    with st.expander("📅 AI Weekly Strategy", expanded=True): # Default open for visibility
+    # --- AI WEEKLY OUTLOOK ---
+    with st.expander("📅 AI Weekly Strategy", expanded=True): 
         
         if "weekly_outlook" not in st.session_state:
             with st.spinner("Analyzing the week ahead..."):
@@ -176,8 +189,8 @@ try:
 
         st.info(st.session_state.weekly_outlook)
 
-    # --- 24-HOUR TRENDS (Moved Down) ---
-    with st.expander("📈 24-Hour Trends", expanded=False): # Default closed to save space
+    # --- 24-HOUR TRENDS ---
+    with st.expander("📈 24-Hour Trends", expanded=False): 
         try:
             raw_hourly = data['forecast']['hourly']
             current_time_epoch = time.time()
