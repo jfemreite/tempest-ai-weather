@@ -3,6 +3,7 @@ import requests
 import google.generativeai as genai
 import os
 import datetime
+import time
 import pandas as pd
 import altair as alt
 from dotenv import load_dotenv
@@ -146,14 +147,23 @@ try:
     
     st.divider()
 
-    # --- 24-HOUR TRENDS (FIXED) ---
+    # --- 24-HOUR TRENDS (NOW FIXED WITH FILTER) ---
     with st.expander("📈 24-Hour Trends", expanded=True):
         try:
-            # FIX 1: Slice to exactly 24 items so we don't graph 10 days of data
-            hourly_data = data['forecast']['hourly'][:24]
+            # 1. Get raw hourly list
+            raw_hourly = data['forecast']['hourly']
+            
+            # 2. Get CURRENT time (epoch seconds)
+            current_time_epoch = time.time()
+            
+            # 3. FILTER: Only keep hours that are in the future (> now)
+            future_hourly = [h for h in raw_hourly if h['time'] > current_time_epoch]
+            
+            # 4. SLICE: Take only the next 24 hours AFTER filtering
+            chart_slice = future_hourly[:24]
             
             chart_data = []
-            for hour in hourly_data:
+            for hour in chart_slice:
                 ts = hour['time']
                 dt_object = datetime.datetime.fromtimestamp(ts)
                 
@@ -163,29 +173,28 @@ try:
                     "Rain Chance": hour['precip_probability']
                 })
             
-            # FIX 2: Sort the DataFrame by Time to prevent "zig-zag" lines
             df = pd.DataFrame(chart_data)
             df = df.sort_values("Time")
 
-            # CHART 1: Temperature (Simple Line)
+            # CHART 1: Temperature
             st.subheader("Temperature (°F)")
             
+            # Note: format='%a %I %p' adds the Day Name (e.g. "Tue 10 PM")
             temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
-                # We use %I %p to show "02 PM"
-                x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
+                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time"),
                 y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
-                tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Temperature']
+                tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Temperature']
             ).properties(height=200)
             
             st.altair_chart(temp_chart, use_container_width=True)
 
-            # CHART 2: Rain Probability (Fixed Scale Bar)
+            # CHART 2: Rain Probability
             st.subheader("Rain Probability (%)")
             
             rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
-                x=alt.X('Time:T', axis=alt.Axis(format='%I %p'), title="Time"),
+                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time"),
                 y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
-                tooltip=[alt.Tooltip('Time:T', format='%I %p'), 'Rain Chance']
+                tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Rain Chance']
             ).properties(height=200)
 
             st.altair_chart(rain_chart, use_container_width=True)
