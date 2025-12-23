@@ -67,19 +67,17 @@ def get_nws_alerts(lat, lon):
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
 
 # --- HEADER WITH LOGO ---
-# We use columns to put the logo next to the title
-col1, col2 = st.columns([1, 5]) # Ratio: Small logo column, Wide text column
+col1, col2 = st.columns([1, 5]) 
 
 with col1:
-    # We check if file exists so app doesn't crash if upload fails
     if os.path.exists("ramseyct.jpg"):
         st.image("ramseyct.jpg", width=100) 
     else:
-        st.header("☁️") # Fallback emoji if image is missing
+        st.header("☁️") 
 
 with col2:
     st.title("Ramsey Ct. Weather")
-    st.caption("Culdesac Weather App") # Added the sub-text from your logo
+    st.caption("Culdesac Weather App") 
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -166,31 +164,46 @@ try:
     
     st.divider()
 
-    # --- AI WEEKLY OUTLOOK ---
-    with st.expander("📅 AI Weekly Strategy", expanded=True): 
-        
-        if "weekly_outlook" not in st.session_state:
-            with st.spinner("Analyzing the week ahead..."):
-                outlook_prompt = f"""
-                Act as a Weather Strategist for a home called "Ramsey Ct".
-                Here is the 7-day forecast:
-                {daily_forecast_text}
-                
-                Write a "Weekly Outlook" for the user.
-                1. **Headline:** A 4-6 word summary of the week.
-                2. **Trend:** Are we warming up or cooling down?
-                3. **Key Days:** Mention specific days to watch out for.
-                4. **Advice:** One practical tip.
-                
-                Keep it concise and formatted with Markdown.
-                """
-                outlook_response = model.generate_content(outlook_prompt)
-                st.session_state.weekly_outlook = outlook_response.text
+    # --- AI WEEKLY OUTLOOK (With Crash Protection) ---
+    # Logic: Try to generate. If fail, show nothing.
+    
+    ai_outlook_content = None
+    
+    # Check if we already have it
+    if "weekly_outlook" in st.session_state:
+        ai_outlook_content = st.session_state.weekly_outlook
+    else:
+        # If not, try to fetch it safely
+        try:
+            outlook_prompt = f"""
+            Act as a Weather Strategist for a home called "Ramsey Ct".
+            Here is the 7-day forecast:
+            {daily_forecast_text}
+            
+            Write a "Weekly Outlook" for the user.
+            1. **Headline:** A 4-6 word summary of the week.
+            2. **Trend:** Are we warming up or cooling down?
+            3. **Key Days:** Mention specific days to watch out for.
+            4. **Advice:** One practical tip.
+            
+            Keep it concise and formatted with Markdown.
+            """
+            # Timeout protection to prevent hanging
+            outlook_response = model.generate_content(outlook_prompt)
+            st.session_state.weekly_outlook = outlook_response.text
+            ai_outlook_content = outlook_response.text
+        except Exception:
+            # If Quota hit or API fail, we just do nothing here
+            ai_outlook_content = None
 
-        st.info(st.session_state.weekly_outlook)
+    # Only render the Expander if we have content
+    if ai_outlook_content:
+        with st.expander("📅 AI Weekly Strategy", expanded=True): 
+            st.info(ai_outlook_content)
 
     # --- 24-HOUR TRENDS ---
-    with st.expander("📈 24-Hour Trends", expanded=False): 
+    # This code is now OUTSIDE the AI block so it runs even if AI fails
+    with st.expander("📈 24-Hour Trends", expanded=True): 
         try:
             raw_hourly = data['forecast']['hourly']
             current_time_epoch = time.time()
@@ -245,45 +258,35 @@ try:
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # --- TEACHER PROMPT ---
+        # --- TEACHER PROMPT (With Crash Protection) ---
         alert_text = "NO ACTIVE ALERTS."
         if alerts:
             alert_text = f"ACTIVE GOVERNMENT ALERTS: {[a['event'] for a in alerts]}."
 
         system_context = f"""
         Act as a Meteorology Professor for Ramsey Ct.
-        
         LIVE DATA:
         - Pressure: {curr_pres} inHg ({curr_trend_raw})
         - Humidity: {curr_hum}%
         - Temp: {curr_temp} F
         - Wind: {curr_wind} mph (from {curr_dir_cardinal})
         - Rain Today: {curr_rain} inches
-        
-        ALERTS: {alert_text}
-        
         FORECAST:
         {daily_forecast_text}
-        
         USER QUESTION: "{prompt}"
-        
-        FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
-        
-        **The Short Answer**
-        [Direct answer]
-        
-        **The Science Breakdown**
-        * **Observation:** [Data point used] [Source: Sensor]
-        * **Concept:** [Explain the concept]
-        * **Prediction:** [Implication] [Source: AI Model]
         """
 
         with st.chat_message("assistant"):
             with st.spinner("Consulting NWS data..."):
-                response = model.generate_content(system_context)
-                st.markdown(response.text)
-                
-        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                try:
+                    response = model.generate_content(system_context)
+                    st.markdown(response.text)
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
+                except Exception:
+                    # Fallback message if Quota hit
+                    fallback = "I'm currently resting (API Quota Limit). Please check back in a minute!"
+                    st.warning(fallback)
+                    st.session_state.messages.append({"role": "assistant", "content": fallback})
 
     if st.button("Refresh Data"):
         if "weather_data" in st.session_state:
