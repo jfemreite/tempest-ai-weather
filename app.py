@@ -21,13 +21,8 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# --- SMART FALLBACK FUNCTION (UPDATED) ---
+# --- SMART FALLBACK FUNCTION ---
 def ask_gemini_smartly(prompt_text):
-    """
-    Tries to get an answer from a list of models.
-    If the first one is 'tired' (Quota Limit), it tries the next one.
-    """
-    # User-defined model priority list
     models_to_try = [
         'gemini-2.5-flash-lite', 
         'gemini-2.5-flash', 
@@ -38,11 +33,11 @@ def ask_gemini_smartly(prompt_text):
         try:
             model = genai.GenerativeModel(model_name)
             response = model.generate_content(prompt_text)
-            return response.text # Success! Return the text.
+            return response.text 
         except Exception:
-            continue # Failed? Just try the next loop.
+            continue 
             
-    return None # If all models failed.
+    return None 
 
 # 3. Helper Functions
 
@@ -84,12 +79,14 @@ def get_nws_alerts(lat, lon):
 # --- APP SETUP ---
 st.set_page_config(page_title="Ramsey Ct. Weather", page_icon="☁️")
 
-# --- HEADER WITH LOGO ---
-col1, col2 = st.columns([1, 5]) 
+# --- HEADER WITH LOGO (RESIZED) ---
+# Adjusted column ratio to give the image more space
+col1, col2 = st.columns([1.5, 5]) 
 
 with col1:
     if os.path.exists("ramseyct.jpg"):
-        st.image("ramseyct.jpg", width=100) 
+        # UPDATED: Increased width from 100 to 160
+        st.image("ramseyct.jpg", width=160) 
     else:
         st.header("☁️") 
 
@@ -182,13 +179,12 @@ try:
     
     st.divider()
 
-    # --- AI WEEKLY OUTLOOK (With Smart Fallback) ---
+    # --- AI WEEKLY OUTLOOK ---
     ai_outlook_content = None
     
     if "weekly_outlook" in st.session_state:
         ai_outlook_content = st.session_state.weekly_outlook
     else:
-        # Use our new fallback function
         outlook_prompt = f"""
         Act as a Weather Strategist for a home called "Ramsey Ct".
         Here is the 7-day forecast:
@@ -234,7 +230,6 @@ try:
             df = pd.DataFrame(chart_data)
             df = df.sort_values("Time")
 
-            # CHART 1: Temperature
             st.subheader("Temperature (°F)")
             temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
                 x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
@@ -243,7 +238,6 @@ try:
             ).properties(height=200)
             st.altair_chart(temp_chart, use_container_width=True)
 
-            # CHART 2: Rain Probability
             st.subheader("Rain Probability (%)")
             rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
                 x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
