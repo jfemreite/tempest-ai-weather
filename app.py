@@ -7,6 +7,7 @@ import time
 import pandas as pd
 import altair as alt
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo # Standard library for Timezones
 
 # 1. Load Keys
 load_dotenv()
@@ -105,7 +106,10 @@ try:
         daily_data = data['forecast']['daily'][:7] 
         for day in daily_data:
             day_ts = day['day_start_local']
-            day_name = datetime.datetime.fromtimestamp(day_ts).strftime('%A')
+            # TIMEZONE FIX 1: Convert Forecast Text to Pacific
+            day_dt = datetime.datetime.fromtimestamp(day_ts, ZoneInfo("US/Pacific"))
+            day_name = day_dt.strftime('%A')
+            
             high = day.get('air_temp_high', 'N/A')
             low = day.get('air_temp_low', 'N/A')
             cond = day.get('conditions', 'N/A')
@@ -147,25 +151,29 @@ try:
     
     st.divider()
 
-    # --- 24-HOUR TRENDS (NOW FIXED WITH FILTER) ---
+    # --- 24-HOUR TRENDS (TIMEZONE FIXED) ---
     with st.expander("📈 24-Hour Trends", expanded=True):
         try:
             # 1. Get raw hourly list
             raw_hourly = data['forecast']['hourly']
             
-            # 2. Get CURRENT time (epoch seconds)
+            # 2. Get CURRENT time in Pacific
+            # We filter based on raw timestamps (which are absolute/UTC), so this logic stays robust
             current_time_epoch = time.time()
             
-            # 3. FILTER: Only keep hours that are in the future (> now)
+            # Filter: Keep future hours
             future_hourly = [h for h in raw_hourly if h['time'] > current_time_epoch]
             
-            # 4. SLICE: Take only the next 24 hours AFTER filtering
+            # Slice: Next 24 hours
             chart_slice = future_hourly[:24]
             
             chart_data = []
             for hour in chart_slice:
                 ts = hour['time']
-                dt_object = datetime.datetime.fromtimestamp(ts)
+                
+                # TIMEZONE FIX 2: Convert UTC timestamp to US/Pacific object
+                # This ensures "05:00 UTC" is rendered as "21:00 PST"
+                dt_object = datetime.datetime.fromtimestamp(ts, ZoneInfo("US/Pacific"))
                 
                 chart_data.append({
                     "Time": dt_object, 
@@ -179,9 +187,8 @@ try:
             # CHART 1: Temperature
             st.subheader("Temperature (°F)")
             
-            # Note: format='%a %I %p' adds the Day Name (e.g. "Tue 10 PM")
             temp_chart = alt.Chart(df).mark_line(color='#FF5733').encode(
-                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time"),
+                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
                 y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
                 tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Temperature']
             ).properties(height=200)
@@ -192,7 +199,7 @@ try:
             st.subheader("Rain Probability (%)")
             
             rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
-                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time"),
+                x=alt.X('Time:T', axis=alt.Axis(format='%a %I %p'), title="Time (PST)"),
                 y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
                 tooltip=[alt.Tooltip('Time:T', format='%a %I %p'), 'Rain Chance']
             ).properties(height=200)
