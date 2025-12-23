@@ -21,10 +21,29 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-try:
-    model = genai.GenerativeModel('gemini-2.5-flash')
-except:
-    model = genai.GenerativeModel('gemini-1.5-flash')
+# --- NEW: SMART FALLBACK FUNCTION ---
+def ask_gemini_smartly(prompt_text):
+    """
+    Tries to get an answer from a list of models.
+    If the first one is 'tired' (Quota Limit), it tries the next one.
+    """
+    # Priority list: Best/Fastest -> Backup -> Older/Stable
+    models_to_try = [
+        'gemini-2.5-flash', 
+        'gemini-1.5-flash', 
+        'gemini-1.5-pro',
+        'gemini-1.0-pro'
+    ]
+    
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt_text)
+            return response.text # Success! Return the text.
+        except Exception:
+            continue # Failed? Just try the next loop.
+            
+    return None # If all models failed.
 
 # 3. Helper Functions
 
@@ -164,45 +183,37 @@ try:
     
     st.divider()
 
-    # --- AI WEEKLY OUTLOOK (With Crash Protection) ---
-    # Logic: Try to generate. If fail, show nothing.
-    
+    # --- AI WEEKLY OUTLOOK (With Smart Fallback) ---
     ai_outlook_content = None
     
-    # Check if we already have it
     if "weekly_outlook" in st.session_state:
         ai_outlook_content = st.session_state.weekly_outlook
     else:
-        # If not, try to fetch it safely
-        try:
-            outlook_prompt = f"""
-            Act as a Weather Strategist for a home called "Ramsey Ct".
-            Here is the 7-day forecast:
-            {daily_forecast_text}
-            
-            Write a "Weekly Outlook" for the user.
-            1. **Headline:** A 4-6 word summary of the week.
-            2. **Trend:** Are we warming up or cooling down?
-            3. **Key Days:** Mention specific days to watch out for.
-            4. **Advice:** One practical tip.
-            
-            Keep it concise and formatted with Markdown.
-            """
-            # Timeout protection to prevent hanging
-            outlook_response = model.generate_content(outlook_prompt)
-            st.session_state.weekly_outlook = outlook_response.text
-            ai_outlook_content = outlook_response.text
-        except Exception:
-            # If Quota hit or API fail, we just do nothing here
-            ai_outlook_content = None
+        # Use our new fallback function
+        outlook_prompt = f"""
+        Act as a Weather Strategist for a home called "Ramsey Ct".
+        Here is the 7-day forecast:
+        {daily_forecast_text}
+        
+        Write a "Weekly Outlook" for the user.
+        1. **Headline:** A 4-6 word summary of the week.
+        2. **Trend:** Are we warming up or cooling down?
+        3. **Key Days:** Mention specific days to watch out for.
+        4. **Advice:** One practical tip.
+        
+        Keep it concise and formatted with Markdown.
+        """
+        response_text = ask_gemini_smartly(outlook_prompt)
+        
+        if response_text:
+            st.session_state.weekly_outlook = response_text
+            ai_outlook_content = response_text
 
-    # Only render the Expander if we have content
     if ai_outlook_content:
         with st.expander("📅 AI Weekly Strategy", expanded=True): 
             st.info(ai_outlook_content)
 
     # --- 24-HOUR TRENDS ---
-    # This code is now OUTSIDE the AI block so it runs even if AI fails
     with st.expander("📈 24-Hour Trends", expanded=True): 
         try:
             raw_hourly = data['forecast']['hourly']
@@ -258,11 +269,6 @@ try:
             st.markdown(prompt)
         st.session_state.messages.append({"role": "user", "content": prompt})
 
-        # --- TEACHER PROMPT (With Crash Protection) ---
-        alert_text = "NO ACTIVE ALERTS."
-        if alerts:
-            alert_text = f"ACTIVE GOVERNMENT ALERTS: {[a['event'] for a in alerts]}."
-
         system_context = f"""
         Act as a Meteorology Professor for Ramsey Ct.
         LIVE DATA:
@@ -278,13 +284,14 @@ try:
 
         with st.chat_message("assistant"):
             with st.spinner("Consulting NWS data..."):
-                try:
-                    response = model.generate_content(system_context)
-                    st.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                except Exception:
-                    # Fallback message if Quota hit
-                    fallback = "I'm currently resting (API Quota Limit). Please check back in a minute!"
+                # Use our new fallback function for chat too
+                response_text = ask_gemini_smartly(system_context)
+                
+                if response_text:
+                    st.markdown(response_text)
+                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                else:
+                    fallback = "I'm currently resting (All API Models Busy). Please check back in a minute!"
                     st.warning(fallback)
                     st.session_state.messages.append({"role": "assistant", "content": fallback})
 
