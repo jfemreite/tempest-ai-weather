@@ -148,57 +148,50 @@ try:
     
     st.divider()
 
-    # --- NEW SECTION: 24-HOUR TRENDS ---
-    # We use st.expander to make it collapsible ("Minimizable")
-    with st.expander("📈 24-Hour Trends (Temperature & Rain)", expanded=True):
+    # --- NEW SECTION: 24-HOUR TRENDS (Separated Charts) ---
+    with st.expander("📈 24-Hour Trends", expanded=True):
         try:
-            # 1. Prepare Data for Chart
             hourly_data = data['forecast']['hourly']
             
-            # Create a simplified list of dictionaries for the dataframe
+            # Prepare Data
             chart_data = []
             for hour in hourly_data:
-                # Calculate readable time (e.g., "2 PM")
                 ts = hour['time']
                 local_time = datetime.datetime.fromtimestamp(ts).strftime('%I %p')
-                
+                # Simplified timestamp for sorting
                 chart_data.append({
                     "Time": local_time,
-                    "Temperature (°F)": hour['air_temperature'],
-                    "Rain Chance (%)": hour['precip_probability'],
-                    "Timestamp": ts # Helper for sorting
+                    "Temperature": hour['air_temperature'],
+                    "Rain Chance": hour['precip_probability'],
+                    "Sort": ts 
                 })
             
-            # Convert to Pandas DataFrame
             df = pd.DataFrame(chart_data)
 
-            # 2. Build the Dual-Axis Chart using Altair
-            base = alt.Chart(df).encode(
-                x=alt.X('Time', sort=None) # Keep order as is
-            )
+            # CHART 1: Temperature (Line)
+            st.subheader("Temperature (°F)")
+            temp_chart = alt.Chart(df).mark_line(point=True, color='#FF5733').encode(
+                x=alt.X('Time', sort=None, axis=alt.Axis(labelAngle=-45)),
+                y=alt.Y('Temperature', scale=alt.Scale(zero=False), title="Temp (°F)"),
+                tooltip=['Time', 'Temperature']
+            ).properties(height=250)
+            
+            st.altair_chart(temp_chart, use_container_width=True)
 
-            # Layer 1: Temperature Line (Red)
-            line = base.mark_line(color='#FF5733').encode(
-                y=alt.Y('Temperature (°F)', axis=alt.Axis(title='Temp (°F)', titleColor='#FF5733'))
-            )
+            # CHART 2: Rain Probability (Bar)
+            st.subheader("Rain Probability (%)")
+            rain_chart = alt.Chart(df).mark_bar(color='#337DFF').encode(
+                x=alt.X('Time', sort=None, axis=alt.Axis(labelAngle=-45)),
+                y=alt.Y('Rain Chance', scale=alt.Scale(domain=[0, 100]), title="Probability (%)"),
+                tooltip=['Time', 'Rain Chance']
+            ).properties(height=200)
 
-            # Layer 2: Rain Area (Blue)
-            area = base.mark_area(opacity=0.3, color='#337DFF').encode(
-                y=alt.Y('Rain Chance (%)', axis=alt.Axis(title='Rain Prob (%)', titleColor='#337DFF'))
-            )
-
-            # Combine them
-            chart = alt.layer(area, line).resolve_scale(
-                y='independent' # Allows two different Y-axes
-            )
-
-            st.altair_chart(chart, use_container_width=True)
+            st.altair_chart(rain_chart, use_container_width=True)
             
         except Exception as e:
             st.error(f"Could not load chart data: {e}")
 
-    # --- AI WEEKLY OUTLOOK (Minimizable) ---
-    # We moved this into an expander too for better organization
+    # --- AI WEEKLY OUTLOOK ---
     with st.expander("📅 AI Weekly Strategy", expanded=False):
         
         if "weekly_outlook" not in st.session_state:
