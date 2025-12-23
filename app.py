@@ -280,3 +280,6 @@ try:
         if "weekly_outlook" in st.session_state:
             del st.session_state.weekly_outlook
         st.rerun()
+
+except Exception as e:
+    st.error(f"Error: {e}")
